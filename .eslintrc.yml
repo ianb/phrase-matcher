@@ -1,0 +1,32 @@
+env:
+  browser: true
+  es6: true
+  node: true
+
+parser: babel-eslint
+
+extends:
+  - eslint:recommended
+  - plugin:mozilla/recommended
+  - plugin:prettier/recommended
+
+plugins:
+  - mozilla
+  - prettier
+
+rules:
+  eqeqeq: error
+  no-console: "warn"
+  no-unused-vars: [error, { vars: all, args: none, ignoreRestSiblings: false }]
+  no-var: error
+  no-warning-comments: off
+  prefer-const: error
+  mozilla/no-import-into-var-and-global: off
+  comma-dangle: off
+  react-hooks/rules-of-hooks: error
+  react-hooks/exhaustive-deps: warn
+  prettier/prettier:
+    - error
+    - {}
+    - fileInfoOptions:
+        ignorePath: ".gitignore"

@@ -1,0 +1,11 @@
+{
+  "plugins": [],
+  "sourceMaps": true,
+  "env": {
+    // Note this applies to the Jest tests:
+    "test": {
+      "plugins": ["@babel/plugin-transform-modules-commonjs"],
+      "presets": [["@babel/preset-env", { "targets": { "node": "current" } }]]
+    }
+  }
+}
