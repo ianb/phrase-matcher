@@ -40,7 +40,7 @@ export function convertEntities(entityMapping) {
   const result = {};
   for (const name in entityMapping) {
     result[name] = new Alternatives(
-      entityMapping[name].map(e => makeWordMatcher(e))
+      entityMapping[name].map((e) => makeWordMatcher(e))
     );
   }
   return result;
@@ -82,7 +82,7 @@ export function compile(string, options) {
       parameters[parameter] = value;
       toParse = phrase;
     } else if (toParse.startsWith("[")) {
-      const { slot, phrase } = _getSlot(toParse);
+      const { slot, phrase, empty } = _getSlot(toParse);
       toParse = phrase;
       if (slot.includes(":")) {
         const parts = slot.split(":");
@@ -91,22 +91,29 @@ export function compile(string, options) {
         if (!entities[entityName]) {
           throw new Error(`No entity type by the name ${entityName}`);
         }
-        seq.push(new Slot(entities[entityName], slotName));
+        seq.push(new Slot(entities[entityName], slotName, empty));
       } else {
-        seq.push(new Slot(new Wildcard(), slot));
+        seq.push(new Slot(new Wildcard(empty), slot));
       }
     } else if (toParse.startsWith("(")) {
       const { alts, phrase, empty } = _getAlternatives(toParse);
       toParse = phrase;
-      const altWords = alts.map(words => makeWordMatcher(words));
+      const altWords = alts.map((words) => makeWordMatcher(words));
       seq.push(new Alternatives(altWords, empty));
     } else {
       const { words, phrase } = _getWords(toParse);
-      for (const word of words.split(/\s+/g)) {
+      for (let word of words.split(/\s+/g)) {
+        let empty = false;
+        if (word.endsWith("?")) {
+          empty = true;
+          word = word.substr(0, word.length - 1);
+        }
         if (_isAltWord(word)) {
-          seq.push(new Alternatives(_altWords(word).map(w => new Word(w))));
+          seq.push(
+            new Alternatives(_altWords(word).map((w) => new Word(w, empty)))
+          );
         } else {
-          seq.push(new Word(word));
+          seq.push(new Word(word, empty));
         }
       }
       toParse = phrase;
@@ -127,11 +134,11 @@ function _getAlternatives(phrase) {
   }
   let alts = phrase.substr(0, phrase.indexOf(")"));
   alts = alts.split("|");
-  alts = alts.map(w => w.trim());
+  alts = alts.map((w) => w.trim());
   let empty = false;
   if (alts.includes("")) {
     empty = true;
-    alts = alts.filter(w => w);
+    alts = alts.filter((w) => w);
   }
   let altWords = [];
   for (const word of alts) {
@@ -142,6 +149,10 @@ function _getAlternatives(phrase) {
     }
   }
   phrase = phrase.substr(phrase.indexOf(")") + 1).trim();
+  if (phrase.startsWith("?")) {
+    empty = true;
+    phrase = phrase.substr(1).trim();
+  }
   return { phrase, alts: altWords, empty };
 }
 
@@ -155,7 +166,12 @@ function _getSlot(phrase) {
   }
   const slot = phrase.substr(0, phrase.indexOf("]")).trim();
   phrase = phrase.substr(phrase.indexOf("]") + 1).trim();
-  return { slot, phrase };
+  let empty = false;
+  if (phrase.startsWith("?")) {
+    empty = true;
+    phrase = phrase.substr(1);
+  }
+  return { slot, phrase, empty };
 }
 
 function _getWords(phrase) {

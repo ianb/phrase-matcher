@@ -41,15 +41,16 @@ function setUnions(arrayOfSets) {
 
 export function makeWordList(string) {
   string = string.trim();
-  return string.split(/\s+/g).map(w => new Word(w));
+  return string.split(/\s+/g).map((w) => new Word(w));
 }
 
 export class Word {
-  constructor(source) {
+  constructor(source, empty = false) {
     this.source = source;
     this.word = normalize(source);
     this.aliases = aliases.get(this.word) || [];
     this.multiwordAliases = multiwordAliases.get(this.word);
+    this.empty = empty;
   }
 
   matchUtterance(match) {
@@ -57,10 +58,13 @@ export class Word {
       // This word normalized to nothing, which is fine...
       return [match];
     }
-    if (match.utteranceExhausted()) {
-      return [];
-    }
     let result = [];
+    if (this.empty) {
+      result.push(match);
+    }
+    if (match.utteranceExhausted()) {
+      return result;
+    }
     const otherWord = match.utteranceWord();
     if (otherWord.isStopword()) {
       result = this.matchUtterance(match.clone({ addIndex: 1, addSkipped: 1 }));
@@ -115,13 +119,15 @@ export class Word {
 
   toString() {
     if (this.source === this.word) {
-      return `Word(${JSON.stringify(this.source)})`;
+      return `Word(${JSON.stringify(this.source)}${this.empty ? ", ?" : ""})`;
     }
-    return `Word(${JSON.stringify(this.source)}->${this.word})`;
+    return `Word(${JSON.stringify(this.source)}->${this.word}${
+      this.empty ? ", ?" : ""
+    })`;
   }
 
   toSource() {
-    return this.source;
+    return this.source + (this.empty ? "?" : "");
   }
 
   enumeratePhrases(filler) {
@@ -131,6 +137,9 @@ export class Word {
       .concat(this.aliases.map(w => [w]))
       .concat(this.multiwordAliases || []);
     */
+    if (this.empty) {
+      return [[], [this.word]];
+    }
     return [[this.word]];
   }
 
@@ -228,15 +237,12 @@ export class Alternatives {
   }
 
   toSource() {
-    const options = this.alternatives.map(a => a.toSource());
-    if (this.empty) {
-      options.push("");
-    }
-    return `(${options.join(" | ")})`;
+    const options = this.alternatives.map((a) => a.toSource());
+    return `(${options.join(" | ")})${this.empty ? "?" : ""}`;
   }
 
   enumeratePhrases(filler) {
-    let words = this.alternatives.map(a => a.enumeratePhrases(filler));
+    let words = this.alternatives.map((a) => a.enumeratePhrases(filler));
     words = words.flat();
     if (this.empty) {
       words.push([]);
@@ -245,7 +251,7 @@ export class Alternatives {
   }
 
   slotNames() {
-    return setUnions(this.alternatives.map(w => w.slotNames()));
+    return setUnions(this.alternatives.map((w) => w.slotNames()));
   }
 }
 
@@ -268,11 +274,11 @@ export class Sequence {
   }
 
   toSource() {
-    return this.patterns.map(p => p.toSource()).join(" ");
+    return this.patterns.map((p) => p.toSource()).join(" ");
   }
 
   enumeratePhrases(filler) {
-    const words = this.patterns.map(p => p.enumeratePhrases(filler));
+    const words = this.patterns.map((p) => p.enumeratePhrases(filler));
     // Now we have to do a cross product around each of these
     function crossProduct(items) {
       if (items.length === 1) {
@@ -282,7 +288,7 @@ export class Sequence {
       const rest = items.slice(1);
       const restCrossProduct = crossProduct(rest);
       const result = first
-        .map(f => restCrossProduct.map(r => f.concat(r)))
+        .map((f) => restCrossProduct.map((r) => f.concat(r)))
         .flat();
       return result;
     }
@@ -290,7 +296,7 @@ export class Sequence {
   }
 
   slotNames() {
-    return setUnions(this.patterns.map(w => w.slotNames()));
+    return setUnions(this.patterns.map((w) => w.slotNames()));
   }
 }
 
@@ -335,17 +341,21 @@ export class Wildcard {
 }
 
 export class Slot {
-  constructor(pattern, slotName) {
+  constructor(pattern, slotName, empty = false) {
     this.pattern = pattern;
     if (!slotName) {
       throw new Error("Slot slotName is required");
     }
     this.slotName = slotName;
+    this.empty = empty;
   }
 
   matchUtterance(match) {
     const results = this.pattern.matchUtterance(match);
     const newResults = [];
+    if (this.empty) {
+      newResults.push(match);
+    }
     for (const result of results) {
       const words = match.utterance.slice(match.index, result.index);
       const newResult = result.clone({ slots: { [this.slotName]: words } });
@@ -355,11 +365,16 @@ export class Slot {
   }
 
   toSource() {
-    return `[${this.slotName}:${this.pattern.toSource()}]`;
+    return `[${this.slotName}:${this.pattern.toSource()}]${
+      this.empty ? "?" : ""
+    }`;
   }
 
   enumeratePhrases(filler) {
     const inner = this.pattern.enumeratePhrases(filler);
+    if (this.empty) {
+      result.push([]);
+    }
     const result = filler(this.slotName, this.pattern, inner);
     if (!Array.isArray(result)) {
       throw new Error("Bad result from filler");
@@ -421,7 +436,7 @@ export class MatchResult {
           slotString += ", ";
         }
         slotString += `${name}: `;
-        const content = this.slots[name].map(w => w.source).join(" ");
+        const content = this.slots[name].map((w) => w.source).join(" ");
         slotString += JSON.stringify(content);
         slotString = `, slots: {${slotString}}`;
       }
@@ -463,7 +478,7 @@ export class MatchResult {
   stringSlots() {
     const slots = {};
     for (const name in this.slots) {
-      slots[name] = this.slots[name].map(w => w.source).join(" ");
+      slots[name] = this.slots[name].map((w) => w.source).join(" ");
     }
     return slots;
   }
