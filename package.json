@@ -26,7 +26,8 @@
     "jest": "^26.4.1",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.0.5",
-    "prettier-linter-helpers": "^1.0.0"
+    "prettier-linter-helpers": "^1.0.0",
+    "rollup": "^2.26.5"
   },
   "dependencies": {},
   "homepage": "https://github.com/ianb/phrase-matcher",
@@ -39,6 +40,7 @@
     "test": "jest",
     "format": "prettier 'extension/**/*.{js,jsx,css}' --write",
     "lint": "npm-run-all lint:*",
-    "lint:js": "eslint --rule '{\"no-console\": \"error\"}' --ext 'js,jsx' extension/ bin/"
+    "lint:js": "eslint --rule '{\"no-console\": \"error\"}' --ext 'js,jsx' extension/ bin/",
+    "rollup": "rollup src/api.js --format umd --name phraseMatcher -o dist/phraseMatcher.js"
   }
 }
