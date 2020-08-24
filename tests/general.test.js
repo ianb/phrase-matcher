@@ -34,6 +34,8 @@ test("compiler", () => {
     'FullPhrase("google images (of | for)? [query:+]", parameters={"service":"images"})'
   );
 
+  expect(compile("* computer *").toString()).toBe('FullPhrase("* computer *")');
+
   const entities = convertEntities({ lang: ["Spanish", "English"] });
   expect(
     compile(
@@ -69,6 +71,12 @@ test("basic matches", () => {
   expect(match("this test", phrase)).toEqual([]);
 
   expect(match("this no is testy", phrase)).toEqual([]);
+
+  expect(
+    match("are you a computer?", compile("* computer *"))[0].toString()
+  ).toBe(
+    'MatchResult("are you a computer?^^", skippedWords: 3, capturedWords: 1)'
+  );
 });
 
 test("alternative matches", () => {

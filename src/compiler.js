@@ -108,7 +108,9 @@ export function compile(string, options) {
           empty = true;
           word = word.substr(0, word.length - 1);
         }
-        if (_isAltWord(word)) {
+        if (word === "*") {
+          seq.push(new Wildcard(true));
+        } else if (_isAltWord(word)) {
           seq.push(
             new Alternatives(_altWords(word).map((w) => new Word(w, empty)))
           );
