@@ -76,6 +76,10 @@ export function compile(string, options) {
   const seq = [];
   const parameters = {};
   let toParse = string;
+  // This is a kind of hacky way to make something like "page(s)" change to "page{s}" which is easier to parse:
+  toParse = toParse.replace(/(?<=[^\s])\(([^\s)]+)\)/g, (match, group1) => {
+    return `{${group1}}`;
+  });
   while (toParse) {
     if (_isParameter(toParse)) {
       const { parameter, value, phrase } = _getParameter(toParse);
