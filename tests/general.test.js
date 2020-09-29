@@ -1,13 +1,50 @@
 /* globals test, expect */
 
 const { PhraseSet } = require("../src/findMatch.js");
-const { compile, convertEntities } = require("../src/compiler.js");
+const {
+  compile,
+  convertEntities,
+  splitPhraseLines,
+} = require("../src/compiler.js");
 const { MatchResult } = require("../src/textMatching.js");
 
 function match(utterance, matchPhrase) {
   const match = new MatchResult({ utterance });
   return matchPhrase.matchUtterance(match);
 }
+
+test("splitter", () => {
+  expect(
+    splitPhraseLines(`
+  foo bar
+  # a comment
+
+  baz {
+    some stuff
+  }
+
+  bar {
+    some {} stuff { {}}
+  }
+
+  some (
+    word
+    | other
+  )
+
+  a [
+    test
+  ]
+
+  `)
+  ).toEqual([
+    "foo bar",
+    "baz {\n    some stuff\n  }",
+    "bar {\n    some {} stuff { {}}\n  }",
+    "some (\n    word\n    | other\n  )",
+    "a [\n    test\n  ]",
+  ]);
+});
 
 test("compiler", () => {
   expect(

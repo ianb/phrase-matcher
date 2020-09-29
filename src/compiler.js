@@ -59,6 +59,47 @@ export function splitPhraseLines(string) {
     throw new Error(`Bad input: ${string}`);
   }
   const result = [];
+  let balances = "";
+  let lastNewline = -1;
+  if (!string.endsWith("\n")) {
+    string += "\n";
+  }
+  for (let i = 0; i < string.length; i++) {
+    const c = string.charAt(i);
+    if (c === "}" || c == "]" || c == ")") {
+      if (!balances) {
+        const exc = new Error(`Unbalanced "${c}" at position ${i}`);
+        exc.position = i;
+        throw exc;
+      }
+      const last = balances.charAt(balances.length - 1);
+      let err;
+      if (
+        (c === "}" && last !== "{") ||
+        (c === ")" && last !== "(") ||
+        (c === "]" && last !== "[")
+      ) {
+        const exc = new Error(`Got "${c}" when expecting to close "${last}"`);
+        exc.position = i;
+        throw exc;
+      }
+      balances = balances.substr(0, balances.length - 1);
+    } else if (/[\[\{\(]/.test(c)) {
+      balances += c;
+    } else if (c === "\n" && !balances) {
+      const line = string.substr(lastNewline + 1, i - lastNewline).trim();
+      if (line && !line.startsWith("#")) {
+        result.push(line);
+      }
+      lastNewline = i;
+    }
+  }
+  if (balances) {
+    const exc = new Error(`Open "${balances}" in string`);
+    exc.position = string.length - 1;
+    throw exc;
+  }
+  return result;
   for (let line of string.split("\n")) {
     line = line.trim();
     if (!line || line.startsWith("#") || line.startsWith("//")) {
