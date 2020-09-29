@@ -73,7 +73,6 @@ export function splitPhraseLines(string) {
         throw exc;
       }
       const last = balances.charAt(balances.length - 1);
-      let err;
       if (
         (c === "}" && last !== "{") ||
         (c === ")" && last !== "(") ||
@@ -115,9 +114,9 @@ export function compile(string, options) {
   });
   while (toParse) {
     if (_isParameter(toParse)) {
-      const { parameter, value, phrase } = _getParameter(toParse);
-      parameters[parameter] = value;
-      toParse = phrase;
+      const paramResult = _getParameters(toParse);
+      Object.assign(parameters, paramResult.parameters);
+      toParse = paramResult.phrase;
     } else if (toParse.startsWith("[")) {
       const { slot, phrase, empty } = _getSlot(toParse);
       toParse = phrase;
@@ -215,21 +214,14 @@ function _getSlot(phrase) {
 
 function _getWords(phrase) {
   const nextParen = phrase.indexOf("(");
-  const nextBrace = phrase.indexOf("[");
-  let next;
-  if (nextParen === -1 && nextBrace === -1) {
+  const nextBracket = phrase.indexOf("[");
+  const nextBrace = phrase.search(/(?<=\s)\{/);
+  if (nextParen === -1 && nextBracket === -1 && nextBrace === -1) {
     // There are no special characters
     return { words: phrase, phrase: "" };
   }
-  if (nextParen !== -1 && nextBrace === -1) {
-    next = nextParen;
-  } else if (nextBrace !== -1 && nextParen === -1) {
-    next = nextBrace;
-  } else if (nextBrace < nextParen) {
-    next = nextBrace;
-  } else {
-    next = nextParen;
-  }
+  const nexts = [nextParen, nextBracket, nextBrace].filter((x) => x !== -1);
+  const next = Math.min(...nexts);
   const words = phrase.substr(0, next).trim();
   return { words, phrase: phrase.substr(next) };
 }
@@ -246,22 +238,99 @@ function _altWords(string) {
 }
 
 function _isParameter(phrase) {
-  return /^\[\w+=/.test(phrase);
+  return /^\[\w+=/.test(phrase) || phrase.startsWith("{");
 }
 
-function _getParameter(phrase) {
-  if (!phrase.startsWith("[")) {
+function _getParameters(phrase) {
+  const originalPhrase = phrase;
+  if (!phrase.startsWith("[") && !phrase.startsWith("{")) {
     throw new Error("Expected [");
   }
+  let balances = phrase.charAt(0);
   phrase = phrase.substr(1);
-  if (!phrase.includes("]")) {
-    throw new Error("Missing ]");
+  let paramSetter;
+  for (let i = 0; i < phrase.length; i++) {
+    const c = phrase.charAt(i);
+    if (c === "{" || c === "(" || c === "[") {
+      balances += c;
+    }
+    if (c === "}" || c === ")" || c === "]") {
+      const last = balances.charAt(balances.length - 1);
+      if (
+        (c === "}" && last !== "{") ||
+        (c === ")" && last !== "(") ||
+        (c === "]" && last !== "[")
+      ) {
+        throw new Error(`Unbalanced ${c}, expected to close ${last}`);
+      }
+      balances = balances.substr(0, balances.length - 1);
+      if (!balances) {
+        paramSetter = phrase.substr(0, i);
+        phrase = phrase.substr(i + 1);
+        break;
+      }
+    }
   }
-  const paramSetter = phrase.substr(0, phrase.indexOf("]")).trim();
-  phrase = phrase.substr(phrase.indexOf("]") + 1).trim();
-  const parts = paramSetter.split("=");
-  if (parts.length !== 2) {
-    throw new Error(`Bad parameter assignment: ${paramSetter}`);
+  if (balances) {
+    throw new Error(
+      `Unclosed in expression "${originalPhrase}": "${balances}"`
+    );
   }
-  return { parameter: parts[0], value: parts[1], phrase };
+  paramSetter = paramSetter.trim();
+  const parameters = {};
+  const matches = Array.from(paramSetter.matchAll(/\s*([a-zA-Z0-9_-]+)\s*=/g));
+  if (!matches || !matches.length) {
+    throw new Error(`No variables in {${paramSetter}}`);
+  }
+  if (paramSetter.substr(0, matches[0].index).trim()) {
+    throw new Error(
+      `Unexpected text before variable assignment (${JSON.stringify(
+        paramSetter.substr(0, matches[0].index).trim()
+      )}) in {${paramSetter}}`
+    );
+  }
+  // Sentinal to make the loop below work better:
+  matches.push({ index: paramSetter.length });
+  let lastVariable;
+  for (let i = 0; i < matches.length; i++) {
+    if (lastVariable) {
+      const value = dedentTrailingLines(
+        paramSetter.substring(
+          matches[i - 1].index + matches[i - 1][0].length,
+          matches[i].index
+        )
+      );
+      if (lastVariable in parameters) {
+        if (Array.isArray(parameters[lastVariable])) {
+          parameters[lastVariable].push(value);
+        } else {
+          parameters[lastVariable] = [parameters[lastVariable], value];
+        }
+      } else {
+        parameters[lastVariable] = value;
+      }
+    }
+    lastVariable = matches[i][1];
+  }
+  return { parameters, phrase };
+}
+
+function dedentTrailingLines(string) {
+  const lines = string.trim().split(/\n/g);
+  let minIndent;
+  for (let i = 1; i < lines.length; i++) {
+    const match = /^\s+/.exec(lines[i]);
+    const length = match ? match[0].length : 0;
+    if (minIndent === undefined || length < minIndent) {
+      minIndent = length;
+    }
+  }
+  if (minIndent) {
+    for (let i = 1; i < lines.length; i++) {
+      lines[i] = lines[i].substr(minIndent);
+    }
+    return lines.join("\n");
+  } else {
+    return string.trim();
+  }
 }

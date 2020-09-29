@@ -175,6 +175,23 @@ test("Equations", () => {
   );
 });
 
+test("Parameters", () => {
+  expect(
+    compile(`test phrase {
+    say = this is
+      a test of
+      this
+    say = second
+    say say = third
+    foo = bar
+    bar
+    bar
+  }`).toString()
+  ).toBe(
+    'FullPhrase("test phrase", parameters={"say":["this is\\na test of\\nthis","second\\nsay","third"],"foo":"bar\\nbar\\nbar"})'
+  );
+});
+
 test("Prioritizing matches", () => {
   const fallback = compile("[query]", { intentName: "fallback" });
   const search = compile("search (for |) [query]", { intentName: "search" });
