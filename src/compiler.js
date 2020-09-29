@@ -100,14 +100,6 @@ export function splitPhraseLines(string) {
     throw exc;
   }
   return result;
-  for (let line of string.split("\n")) {
-    line = line.trim();
-    if (!line || line.startsWith("#") || line.startsWith("//")) {
-      continue;
-    }
-    result.push(line);
-  }
-  return result;
 }
 
 export function compile(string, options) {
